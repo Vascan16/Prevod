@@ -178,7 +178,7 @@
                 <button id="btnEditFromRead" class="text-[11px] font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-lg tracking-wider shrink-0">UREDI</button>
             </div>
 
-            <div class="flex-grow overflow-y-auto no-scrollbar p-6 pt-2 pb-32 flex flex-col justify-start">
+            <div id="readScrollArea" class="flex-grow overflow-y-auto no-scrollbar p-6 pt-2 pb-32 flex flex-col justify-start">
                 <div id="textContent" class="text-[21px] sm:text-[23px] leading-[1.5] text-slate-800 whitespace-pre-wrap select-none min-h-[50vh] tracking-normal font-normal">
                     <!-- Tekst -->
                 </div>
@@ -401,6 +401,10 @@
             document.getElementById('btnPrevCard').disabled = currentPageIndex === 0;
             document.getElementById('btnNextCard').classList.toggle('hidden', currentPageIndex === pages.length - 1);
             document.getElementById('btnFinishRead').classList.toggle('hidden', currentPageIndex !== pages.length - 1);
+            
+            // Ponastavi skrol na vrh ob vsaki menjavi strani
+            const scrollArea = document.getElementById('readScrollArea');
+            if(scrollArea) scrollArea.scrollTop = 0;
         }
 
         // --- PREVAJANJE (Z LOKALNIM SPOMINOM) ---
@@ -545,24 +549,56 @@
         });
         
         // --- DOTIK (Telefon / Tablica) ---
+        let startTouchX = 0, startTouchY = 0;
+        let hasTouchMoved = false;
+        let selectionTimeout = null;
+
         container.addEventListener('touchstart', (e) => {
             if(e.target.classList.contains('word')) {
-                isSelecting=true; startIdx = parseInt(e.target.dataset.index); endIdx=startIdx; updateSelection(); hideTooltip();
+                startTouchX = e.touches[0].clientX;
+                startTouchY = e.touches[0].clientY;
+                hasTouchMoved = false;
+                isSelecting = false; // Ne začnemo izbirati takoj
+                startIdx = parseInt(e.target.dataset.index);
+                endIdx = startIdx;
+
+                // Če uporabnik zadrži prst dalj časa (500ms), preklopimo v izbiranje več besed.
+                // Podaljšano s 300ms na 500ms, da se ne aktivira ponesreči med branjem/skrolanjem.
+                selectionTimeout = setTimeout(() => {
+                    if(!hasTouchMoved) {
+                        isSelecting = true;
+                        updateSelection();
+                        hideTooltip();
+                        if (navigator.vibrate) navigator.vibrate(50); // Kratka vibracija
+                    }
+                }, 500);
             }
         }, {passive: true});
         
         container.addEventListener('touchmove', (e) => {
-            if(!isSelecting) return;
-            // Preprečimo drsenje strani med izbiranjem besedila, da se ekran ne premika gor in dol
-            if(e.cancelable) e.preventDefault(); 
-            
+            if (!startTouchX) return;
             const touch = e.touches[0];
-            const el = document.elementFromPoint(touch.clientX, touch.clientY);
-            if(el && el.classList.contains('word')) {
-                const currentIdx = parseInt(el.dataset.index);
-                if (currentIdx !== endIdx) {
-                    endIdx = currentIdx;
-                    updateSelection();
+            const dx = touch.clientX - startTouchX;
+            const dy = touch.clientY - startTouchY;
+
+            // Če se prst premakne za več kot 8px, takoj prekličemo dolg pritisk (ker gre za skrolanje)
+            if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
+                hasTouchMoved = true;
+                if (!isSelecting) {
+                    clearTimeout(selectionTimeout);
+                }
+            }
+
+            // Če pa smo že v načinu izbiranja (zaradi dolgega pritiska), preprečimo skrol in vlečemo besede
+            if(isSelecting) {
+                if(e.cancelable) e.preventDefault(); 
+                const el = document.elementFromPoint(touch.clientX, touch.clientY);
+                if(el && el.classList.contains('word')) {
+                    const currentIdx = parseInt(el.dataset.index);
+                    if (currentIdx !== endIdx) {
+                        endIdx = currentIdx;
+                        updateSelection();
+                    }
                 }
             }
         }, {passive: false});
@@ -588,7 +624,40 @@
         };
         
         window.addEventListener('mouseup', finishSelection);
-        window.addEventListener('touchend', finishSelection);
+        
+        window.addEventListener('touchend', (e) => {
+            clearTimeout(selectionTimeout);
+            
+            if (!startTouchX) {
+                finishSelection();
+                return;
+            }
+
+            // Če smo samo skrolali in nismo bili v načinu izbiranja (long press), potem zanemarimo
+            if (hasTouchMoved && !isSelecting) {
+                startTouchX = 0; startTouchY = 0;
+                return; 
+            }
+
+            if (isSelecting) {
+                // Zaključek daljšega vlečenja (drag-to-select)
+                finishSelection();
+            } else if (!hasTouchMoved) {
+                // Hiter "Tap" na posamezno besedo (ker se nismo premaknili)
+                const touchTarget = document.elementFromPoint(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+                if (touchTarget && touchTarget.classList.contains('word')) {
+                    startIdx = parseInt(touchTarget.dataset.index);
+                    endIdx = startIdx;
+                    isSelecting = true;
+                    updateSelection();
+                    finishSelection();
+                } else {
+                    hideTooltip(); // Če je tapnil nekam v prazno
+                }
+            }
+
+            startTouchX = 0; startTouchY = 0;
+        });
 
         function updateSelection() {
             const min = Math.min(startIdx, endIdx), max = Math.max(startIdx, endIdx);
