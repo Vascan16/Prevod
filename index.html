@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Pomenko">
+    
+    <!-- Ikona za iOS Home Screen -->
+    <link rel="apple-touch-icon" href="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e4/Google_Translate_Icon.png/512px-Google_Translate_Icon.png">
+    
+    <title>Pomenko | Pametni bralnik</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonti -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --ios-safe-bottom: env(safe-area-inset-bottom);
+            --ios-safe-top: env(safe-area-inset-top);
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .word {
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            border-radius: 4px;
+            padding: 0 2px;
+            margin: 0 -1px;
+        }
+        
+        .word:active {
+            transform: scale(0.95);
+            background-color: rgba(59, 130, 246, 0.2);
+        }
+
+        .word.active {
+            background-color: #3b82f6;
+            color: white;
+            box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.4);
+        }
+        
+        #tooltip {
+            transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            z-index: 100;
+        }
+
+        .loader {
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            border-top: 2px solid #60a5fa;
+            border-radius: 50%;
+            width: 14px;
+            height: 14px;
+            animation: spin 0.8s linear infinite;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* iPhone notch & bottom adjustments */
+        .pb-safe { padding-bottom: calc(1.5rem + var(--ios-safe-bottom)); }
+        .pt-safe { padding-top: calc(0.5rem + var(--ios-safe-top)); }
+
+        /* Glassmorphism */
+        .glass {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+        }
+
+        /* View transitions */
+        .view {
+            transition: opacity 0.4s ease, transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .view-hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: translateY(10px);
+            position: absolute;
+            width: 100%;
+        }
+        .view-active {
+            opacity: 1;
+            pointer-events: auto;
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-slate-900 h-screen flex flex-col overflow-hidden">
+
+    <!-- Navbar -->
+    <header id="mainHeader" class="bg-white/80 backdrop-blur-md border-b border-gray-100 flex-none z-40 pt-safe">
+        <div class="px-5 py-4 flex justify-between items-center max-w-3xl mx-auto w-full">
+            <h1 class="text-xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 tracking-tight flex items-center gap-2 cursor-pointer" id="logoBtn">
+                Pomenko
+            </h1>
+            <div id="authStatus" class="w-2.5 h-2.5 rounded-full bg-red-400 shadow-[0_0_8px_rgba(248,113,113,0.6)]"></div>
+        </div>
+    </header>
+
+    <main class="flex-grow relative overflow-hidden max-w-3xl mx-auto w-full">
+        
+        <!-- POGLED 1: Knjižnica -->
+        <div id="libraryView" class="view view-active h-full flex flex-col overflow-y-auto no-scrollbar p-5">
+            <div class="flex justify-between items-end mb-8 mt-2">
+                <div>
+                    <h2 class="text-3xl font-black text-slate-800">Knjižnica</h2>
+                    <p class="text-slate-400 text-sm font-medium">Tvoja zbirka besedil</p>
+                </div>
+                <button id="btnCreateNew" class="bg-blue-600 text-white p-3 rounded-2xl shadow-lg shadow-blue-200 active:scale-90 transition-transform">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                        <path fill-rule="evenodd" d="M12 3.75a.75.75 0 01.75.75v6.75h6.75a.75.75 0 010 1.5h-6.75v6.75a.75.75 0 01-1.5 0v-6.75H4.5a.75.75 0 010-1.5h6.75V4.5a.75.75 0 01.75-.75z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+            </div>
+            
+            <div id="textsList" class="space-y-4 pb-24">
+                <div class="flex justify-center py-20"><div class="loader !border-slate-200 !border-t-blue-500 !w-8 !h-8"></div></div>
+            </div>
+        </div>
+
+        <!-- POGLED 2: Urejanje -->
+        <div id="editView" class="view view-hidden h-full flex flex-col bg-white p-5">
+            <div class="flex items-center justify-between mb-6">
+                <button id="btnBackFromEdit" class="w-10 h-10 flex items-center justify-center bg-slate-50 text-slate-600 rounded-full active:bg-slate-100">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
+                </button>
+                <h2 class="font-bold text-slate-800">Uredi besedilo</h2>
+                <div class="w-10"></div>
+            </div>
+            
+            <input type="text" id="textTitle" class="w-full text-2xl font-bold outline-none mb-6 placeholder-slate-200 border-none focus:ring-0" placeholder="Naslov zgodbe...">
+            
+            <div class="grid grid-cols-2 gap-3 mb-6 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
+                <select id="srcLang" class="bg-white border border-slate-100 rounded-xl p-3 text-sm font-semibold outline-none shadow-sm">
+                    <option value="Samodejno prepoznaj">Samodejno</option>
+                    <option value="Angleščina">Angleščina</option>
+                    <option value="Nemščina">Nemščina</option>
+                    <option value="Španščina">Španščina</option>
+                </select>
+                <select id="tgtLang" class="bg-white border border-slate-100 rounded-xl p-3 text-sm font-semibold outline-none shadow-sm text-blue-600">
+                    <option value="Slovenščina">Slovenščina</option>
+                    <option value="Angleščina">Angleščina</option>
+                </select>
+            </div>
+
+            <textarea id="textInput" class="w-full flex-grow bg-slate-50 border-none rounded-2xl p-5 focus:ring-2 focus:ring-blue-100 outline-none resize-none text-lg leading-relaxed mb-6" placeholder="Prilepi tekst tukaj..."></textarea>
+            
+            <div class="flex gap-3 mb-4">
+                <button id="btnSaveOnly" class="flex-1 py-4 bg-slate-100 text-slate-600 rounded-2xl font-bold active:bg-slate-200 transition-colors">Shrani</button>
+                <button id="btnSaveAndRead" class="flex-[2] py-4 bg-blue-600 text-white rounded-2xl font-bold shadow-lg shadow-blue-100 active:scale-95 transition-transform">Začni brati</button>
+            </div>
+        </div>
+
+        <!-- POGLED 3: Branje -->
+        <div id="readView" class="view view-hidden h-full flex flex-col bg-white absolute inset-0 z-50">
+            <div class="px-5 py-4 pt-safe flex justify-between items-center border-b border-slate-50 flex-none bg-white/90 backdrop-blur-md">
+                <button id="btnBackFromRead" class="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-full text-slate-500">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
+                </button>
+                <div class="text-center px-4 truncate max-w-[60%]">
+                    <h3 id="readViewHeaderTitle" class="font-bold text-slate-800 text-sm truncate uppercase tracking-tight"></h3>
+                    <div id="readProgress" class="text-[10px] text-slate-400 font-bold tracking-widest uppercase"></div>
+                </div>
+                <button id="btnEditFromRead" class="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">UREDI</button>
+            </div>
+
+            <div class="flex-grow overflow-y-auto no-scrollbar p-6 flex flex-col justify-start pb-52">
+                <div id="textContent" class="text-2xl sm:text-3xl leading-[1.7] text-slate-800 whitespace-pre-wrap select-none min-h-[50vh] font-medium tracking-tight">
+                    <!-- Tekst -->
+                </div>
+            </div>
+
+            <!-- Modern iPhone-style Player & Nav -->
+            <div class="absolute bottom-0 left-0 right-0 glass border-t border-slate-100 p-6 pb-safe flex justify-between items-center z-20">
+                <div class="flex-1 flex justify-start">
+                    <button id="btnPrevCard" class="w-12 h-12 flex items-center justify-center rounded-2xl bg-slate-100 text-slate-400 disabled:opacity-30">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M9.195 18.44c1.25.713 2.805-.19 2.805-1.629v-2.34l6.945 3.968c1.25.714 2.805-.188 2.805-1.628V5.19c0-1.44-1.555-2.342-2.805-1.628L12 7.53v-2.34c0-1.44-1.555-2.343-2.805-1.629l-7.108 4.062c-1.26.72-1.26 2.536 0 3.256l7.108 4.061z" /></svg>
+                    </button>
+                </div>
+                
+                <div class="flex-1 flex justify-center">
+                    <button id="btnPodcastPlay" class="w-16 h-16 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-2xl active:scale-90 transition-all border-4 border-white">
+                        <svg id="iconPlay" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-7 h-7 ml-1"><path fill-rule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clip-rule="evenodd" /></svg>
+                        <svg id="iconPause" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-7 h-7 hidden"><path fill-rule="evenodd" d="M6.75 5.25a.75.75 0 01.75-.75H9a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H7.5a.75.75 0 01-.75-.75V5.25zm7.5 0a.75.75 0 01.75-.75h1.5a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75h-1.5a.75.75 0 01-.75-.75V5.25z" clip-rule="evenodd" /></svg>
+                    </button>
+                </div>
+                
+                <div class="flex-1 flex justify-end">
+                    <button id="btnNextCard" class="w-12 h-12 flex items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-200 active:scale-90">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M5.055 7.06c-1.25-.714-2.805.189-2.805 1.628v8.123c0 1.44 1.555 2.342 2.805 1.628L12 14.471v2.34c0 1.44 1.555 2.342 2.805 1.628l7.108-4.061c1.26-.72 1.26-2.536 0-3.256L14.805 7.06C13.555 6.346 12 7.25 12 8.688v2.34L5.055 7.06z" /></svg>
+                    </button>
+                    <button id="btnFinishRead" class="hidden px-5 h-12 rounded-2xl bg-green-500 text-white font-bold shadow-lg shadow-green-100 items-center justify-center">ZAKLJUČI</button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Tooltip -->
+    <div id="tooltip" class="fixed bg-slate-900 text-white px-5 py-4 rounded-2xl shadow-2xl max-w-[85vw] w-max hidden pointer-events-auto ring-1 ring-white/10">
+        <div class="flex flex-col gap-1">
+            <span id="originalText" class="text-slate-500 text-[10px] font-bold uppercase tracking-widest line-clamp-1"></span>
+            <div id="translatedText" class="text-lg font-semibold flex items-center gap-3">
+                <div class="loader"></div> Prevajam...
+            </div>
+        </div>
+        <div class="absolute w-4 h-4 bg-slate-900 transform rotate-45 -bottom-2 left-1/2 -translate-x-1/2"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, deleteDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ==========================================
+        // 🔑 KONFIGURACIJA (Tukaj vnesi svoje ključe)
+        // ==========================================
+        
+        // 1. Google Gemini API ključ (Dobi ga na: https://aistudio.google.com/)
+        const MY_GEMINI_API_KEY = "VSTAVI_SVOJ_GEMINI_KEY_TUKAJ";
+
+        // 2. Firebase Konfiguracija (Dobi jo v Firebase Console -> Project Settings)
+        const MY_FIREBASE_CONFIG = {
+            apiKey: "VSTAVI_FIREBASE_API_KEY",
+            authDomain: "TVOJ_PROJEKT.firebaseapp.com",
+            projectId: "TVOJ_PROJEKT_ID",
+            storageBucket: "TVOJ_PROJEKT.appspot.com",
+            messagingSenderId: "...",
+            appId: "..."
+        };
+
+        // ==========================================
+        // ⚙️ LOGIKA OKOLJA (Canvas vs GitHub)
+        // ==========================================
+
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : MY_FIREBASE_CONFIG;
+        const geminiApiKey = typeof __gemini_api_key !== 'undefined' ? __gemini_api_key : MY_GEMINI_API_KEY;
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'pomenko-prod';
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // --- STANJA ---
+        let currentUser = null;
+        let allSavedTexts = [];
+        let unsubscribeTexts = null;
+        let currentDoc = { id: null, title: "", content: "", srcLang: "Samodejno prepoznaj", tgtLang: "Slovenščina", completed: false };
+        let pages = [];
+        let currentPageIndex = 0;
+        let allWordsArray = [];
+
+        // --- UI ELEMENTI ---
+        const views = { library: document.getElementById('libraryView'), edit: document.getElementById('editView'), read: document.getElementById('readView') };
+        const libraryList = document.getElementById('textsList');
+        const tooltip = document.getElementById('tooltip');
+
+        // --- AVTENTIKACIJA ---
+        const initAuth = async () => {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            } else {
+                await signInAnonymously(auth);
+            }
+        };
+
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            if (user) {
+                document.getElementById('authStatus').classList.replace('bg-red-400', 'bg-emerald-400');
+                loadLibrary();
+            }
+        });
+        initAuth();
+
+        // --- NAVIGACIJA ---
+        function switchView(target) {
+            Object.values(views).forEach(v => {
+                v.classList.add('view-hidden');
+                v.classList.remove('view-active');
+            });
+            views[target].classList.remove('view-hidden');
+            views[target].classList.add('view-active');
+            if (target === 'read') document.getElementById('mainHeader').classList.add('hidden');
+            else document.getElementById('mainHeader').classList.remove('hidden');
+            hideTooltip();
+        }
+
+        // --- KNJIŽNICA ---
+        function loadLibrary() {
+            const textsRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'texts');
+            unsubscribeTexts = onSnapshot(textsRef, (snap) => {
+                allSavedTexts = [];
+                snap.forEach(d => allSavedTexts.push({ id: d.id, ...d.data() }));
+                allSavedTexts.sort((a, b) => b.updatedAt - a.updatedAt);
+                renderLibrary();
+            });
+        }
+
+        function renderLibrary() {
+            libraryList.innerHTML = '';
+            if (!allSavedTexts.length) {
+                libraryList.innerHTML = '<div class="text-center p-12 bg-white rounded-3xl border-2 border-dashed border-slate-100 text-slate-400 font-medium">Knjižnica je prazna.<br>Dodaj svoj prvi tekst.</div>';
+                return;
+            }
+            allSavedTexts.forEach(item => {
+                const card = document.createElement('div');
+                card.className = "bg-white p-5 rounded-3xl shadow-sm border border-slate-50 flex items-center gap-4 active:scale-95 transition-all cursor-pointer";
+                card.innerHTML = `
+                    <div class="w-12 h-12 rounded-2xl flex items-center justify-center ${item.completed ? 'bg-emerald-50 text-emerald-500' : 'bg-blue-50 text-blue-500'}">
+                        ${item.completed ? '<svg class="w-6 h-6" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.704 4.153a.75.75 0 01.143 1.052l-8 10.5a.75.75 0 01-1.127.075l-4.5-4.5a.75.75 0 011.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 011.05-.143z" clip-rule="evenodd" /></svg>' : '<svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="2"><path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>'}
+                    </div>
+                    <div class="flex-grow">
+                        <h4 class="font-bold text-slate-800">${item.title}</h4>
+                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">${item.srcLang} &rarr; ${item.tgtLang}</p>
+                    </div>
+                    <button class="del-btn p-2 text-slate-200 hover:text-red-400 transition-colors"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                `;
+                card.querySelector('.del-btn').onclick = (e) => { e.stopPropagation(); if(confirm('Izbrišem?')) deleteDoc(doc(db, 'artifacts', appId, 'users', currentUser.uid, 'texts', item.id)); };
+                card.onclick = () => { currentDoc = {...item}; startReading(); };
+                libraryList.appendChild(card);
+            });
+        }
+
+        // --- BRALNIK ---
+        function startReading() {
+            paginate(currentDoc.content);
+            currentPageIndex = 0;
+            renderPage();
+            document.getElementById('readViewHeaderTitle').textContent = currentDoc.title;
+            switchView('read');
+        }
+
+        function paginate(text) {
+            const paragraphs = text.split(/\n+/).filter(p => p.trim());
+            pages = [];
+            let current = "";
+            paragraphs.forEach(p => {
+                if ((current.length + p.length) < 450) current += (current ? "\n\n" : "") + p;
+                else { if(current) pages.push(current); current = p; }
+            });
+            if(current) pages.push(current);
+            if(!pages.length) pages.push("Besedilo je prazno.");
+        }
+
+        function renderPage() {
+            const raw = pages[currentPageIndex];
+            document.getElementById('readProgress').textContent = `DEL ${currentPageIndex + 1} / ${pages.length}`;
+            const parts = raw.split(/([a-zA-ZÀ-ÿščžŠČŽ]+(?:[-'][a-zA-ZÀ-ÿščžŠČŽ]+)*)/g);
+            const container = document.getElementById('textContent');
+            container.innerHTML = '';
+            let idx = 0;
+            parts.forEach(p => {
+                if(/^[a-zA-ZÀ-ÿščžŠČŽ]/.test(p)) {
+                    const s = document.createElement('span'); s.className='word'; s.dataset.index = idx++; s.textContent = p; container.appendChild(s);
+                } else container.appendChild(document.createTextNode(p));
+            });
+            allWordsArray = Array.from(container.querySelectorAll('.word'));
+            document.getElementById('btnPrevCard').disabled = currentPageIndex === 0;
+            document.getElementById('btnNextCard').classList.toggle('hidden', currentPageIndex === pages.length - 1);
+            document.getElementById('btnFinishRead').classList.toggle('hidden', currentPageIndex !== pages.length - 1);
+        }
+
+        // --- PREVAJANJE ---
+        async function translate(text) {
+            if (!geminiApiKey || geminiApiKey.startsWith("VSTAVI")) {
+                document.getElementById('translatedText').innerHTML = '<span class="text-amber-500 text-sm">Vnesi API ključ!</span>';
+                return;
+            }
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`;
+            try {
+                const res = await fetch(url, {
+                    method: 'POST',
+                    body: JSON.stringify({ contents: [{ parts: [{ text: `Prevedi v slovenščino: "${text}"` }] }] })
+                });
+                const data = await res.json();
+                document.getElementById('translatedText').textContent = data.candidates[0].content.parts[0].text.trim();
+            } catch (e) {
+                document.getElementById('translatedText').innerHTML = '<span class="text-red-400">Napaka.</span>';
+            }
+        }
+
+        // --- DOGODKI ---
+        document.getElementById('btnCreateNew').onclick = () => { currentDoc={id:null, title:"", content:"", srcLang:"Samodejno prepoznaj", tgtLang:"Slovenščina", completed:false}; document.getElementById('textTitle').value=""; document.getElementById('textInput').value=""; switchView('edit'); };
+        document.getElementById('logoBtn').onclick = () => switchView('library');
+        document.getElementById('btnBackFromEdit').onclick = () => switchView('library');
+        document.getElementById('btnBackFromRead').onclick = () => switchView('library');
+        document.getElementById('btnNextCard').onclick = () => { currentPageIndex++; renderPage(); };
+        document.getElementById('btnPrevCard').onclick = () => { currentPageIndex--; renderPage(); };
+        
+        document.getElementById('btnSaveAndRead').onclick = async () => {
+            currentDoc.title = document.getElementById('textTitle').value;
+            currentDoc.content = document.getElementById('textInput').value;
+            currentDoc.srcLang = document.getElementById('srcLang').value;
+            currentDoc.tgtLang = document.getElementById('tgtLang').value;
+            const textsRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'texts');
+            const id = currentDoc.id || doc(textsRef).id;
+            await setDoc(doc(textsRef, id), {...currentDoc, id, updatedAt: Date.now()}, {merge:true});
+            currentDoc.id = id;
+            startReading();
+        };
+
+        // Podcast Logic
+        document.getElementById('btnPodcastPlay').onclick = () => {
+            const isPlaying = document.getElementById('iconPlay').classList.toggle('hidden');
+            document.getElementById('iconPause').classList.toggle('hidden');
+            // TUKAJ: window.myPodcastPlayer.toggle()
+        };
+
+        // Tooltip & Selection
+        let isSelecting = false, startIdx = -1, endIdx = -1;
+        const container = document.getElementById('textContent');
+        container.addEventListener('mousedown', (e) => {
+            if(e.target.classList.contains('word')) {
+                isSelecting=true; startIdx = parseInt(e.target.dataset.index); endIdx=startIdx; updateSelection(); hideTooltip();
+            }
+        });
+        container.addEventListener('mouseover', (e) => { if(isSelecting && e.target.classList.contains('word')) { endIdx=parseInt(e.target.dataset.index); updateSelection(); } });
+        window.addEventListener('mouseup', () => {
+            if(isSelecting) {
+                isSelecting=false;
+                const min = Math.min(startIdx, endIdx), max = Math.max(startIdx, endIdx);
+                const first = allWordsArray[min], last = allWordsArray[max];
+                const range = document.createRange(); range.setStartBefore(first); range.setEndAfter(last);
+                const txt = range.toString().trim();
+                if(txt) { showTooltip(txt, first.getBoundingClientRect()); translate(txt); }
+            }
+        });
+
+        function updateSelection() {
+            const min = Math.min(startIdx, endIdx), max = Math.max(startIdx, endIdx);
+            allWordsArray.forEach((w,i) => w.classList.toggle('active', i>=min && i<=max));
+        }
+
+        function showTooltip(txt, r) {
+            tooltip.classList.remove('hidden');
+            document.getElementById('originalText').textContent = txt;
+            document.getElementById('translatedText').innerHTML = '<div class="loader"></div>';
+            const tr = tooltip.getBoundingClientRect();
+            let x = r.left + r.width/2 - tr.width/2, y = r.top - tr.height - 15;
+            if(x < 10) x=10; if(x+tr.width > window.innerWidth-10) x=window.innerWidth-tr.width-10;
+            if(y < 10) y = r.bottom + 15;
+            tooltip.style.left = `${x}px`; tooltip.style.top = `${y}px`;
+        }
+        function hideTooltip() { tooltip.classList.add('hidden'); allWordsArray.forEach(w => w.classList.remove('active')); }
+        
+        // Finalize
+        document.getElementById('btnFinishRead').onclick = async () => {
+            const textsRef = collection(db, 'artifacts', appId, 'users', currentUser.uid, 'texts');
+            await setDoc(doc(textsRef, currentDoc.id), {completed: true, updatedAt: Date.now()}, {merge:true});
+            switchView('library');
+        };
+
+    </script>
+</body>
+</html>
