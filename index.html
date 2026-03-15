@@ -227,7 +227,7 @@
         // ==========================================
         
         // 1. Google Gemini API ključ (Dobi ga na: https://aistudio.google.com/)
-        const MY_GEMINI_API_KEY = "AIzaSyCEqsBPMiXoPlbOt3W7N_iBMOAd3hMNDGk";
+        const MY_GEMINI_API_KEY = "AIzaSyCEqsBPMiXoPlbOt3W7N_iBMOAd3hMNDGk"; // <-- TUKAJ PRILEPI SVOJ KLJUČ MED NAREKOVAJE
 
         // 2. Firebase Konfiguracija (Dobi jo v Firebase Console -> Project Settings)
         const MY_FIREBASE_CONFIG = {
@@ -245,7 +245,8 @@
         // ==========================================
 
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : MY_FIREBASE_CONFIG;
-        const geminiApiKey = typeof __gemini_api_key !== 'undefined' ? __gemini_api_key : MY_GEMINI_API_KEY;
+        // Posodobljeno: Najprej poskusi uporabiti tvoj ključ. Če ga ni, uporabi sistemskega.
+        const geminiApiKey = MY_GEMINI_API_KEY !== "" ? MY_GEMINI_API_KEY : (typeof __gemini_api_key !== 'undefined' ? __gemini_api_key : "");
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'pomenko-prod';
 
         const app = initializeApp(firebaseConfig);
@@ -374,20 +375,38 @@
 
         // --- PREVAJANJE ---
         async function translate(text) {
-            if (!geminiApiKey || geminiApiKey.startsWith("VSTAVI")) {
-                document.getElementById('translatedText').innerHTML = '<span class="text-amber-500 text-sm">Vnesi API ključ!</span>';
-                return;
-            }
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`;
-            try {
-                const res = await fetch(url, {
-                    method: 'POST',
-                    body: JSON.stringify({ contents: [{ parts: [{ text: `Prevedi v slovenščino: "${text}"` }] }] })
-                });
-                const data = await res.json();
-                document.getElementById('translatedText').textContent = data.candidates[0].content.parts[0].text.trim();
-            } catch (e) {
-                document.getElementById('translatedText').innerHTML = '<span class="text-red-400">Napaka.</span>';
+            // Posodobljeno: Zelo strogo navodilo za AI
+            const payload = JSON.stringify({ contents: [{ parts: [{ text: `Prevedi naslednje v slovenščino. Napiši IZKLJUČNO samo prevod in popolnoma ničesar drugega: "${text}"` }] }] });
+            
+            const delays = [1000, 2000, 4000, 8000, 16000];
+            let attempt = 0;
+
+            while (attempt <= delays.length) {
+                try {
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        body: payload
+                    });
+                    
+                    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                    const data = await res.json();
+                    
+                    if (data.candidates && data.candidates.length > 0) {
+                        document.getElementById('translatedText').textContent = data.candidates[0].content.parts[0].text.trim();
+                        return;
+                    } else {
+                        throw new Error("Neveljaven odgovor API-ja");
+                    }
+                } catch (e) {
+                    if (attempt < delays.length) {
+                        await new Promise(resolve => setTimeout(resolve, delays[attempt]));
+                        attempt++;
+                    } else {
+                        document.getElementById('translatedText').innerHTML = '<span class="text-red-400 text-sm">Napaka pri prevajanju. Preverite API ključ.</span>';
+                        return;
+                    }
+                }
             }
         }
 
@@ -399,7 +418,7 @@
         document.getElementById('btnNextCard').onclick = () => { currentPageIndex++; renderPage(); };
         document.getElementById('btnPrevCard').onclick = () => { currentPageIndex--; renderPage(); };
         
-        document.getElementById('btnSaveAndRead').onclick = async () => {
+        async function saveCurrentDoc() {
             currentDoc.title = document.getElementById('textTitle').value;
             currentDoc.content = document.getElementById('textInput').value;
             currentDoc.srcLang = document.getElementById('srcLang').value;
@@ -408,7 +427,24 @@
             const id = currentDoc.id || doc(textsRef).id;
             await setDoc(doc(textsRef, id), {...currentDoc, id, updatedAt: Date.now()}, {merge:true});
             currentDoc.id = id;
+        }
+
+        document.getElementById('btnSaveOnly').onclick = async () => {
+            await saveCurrentDoc();
+            switchView('library');
+        };
+
+        document.getElementById('btnSaveAndRead').onclick = async () => {
+            await saveCurrentDoc();
             startReading();
+        };
+
+        document.getElementById('btnEditFromRead').onclick = () => {
+            document.getElementById('textTitle').value = currentDoc.title || "";
+            document.getElementById('textInput').value = currentDoc.content || "";
+            document.getElementById('srcLang').value = currentDoc.srcLang || "Samodejno prepoznaj";
+            document.getElementById('tgtLang').value = currentDoc.tgtLang || "Slovenščina";
+            switchView('edit');
         };
 
         // Podcast Logic
@@ -454,6 +490,13 @@
             tooltip.style.left = `${x}px`; tooltip.style.top = `${y}px`;
         }
         function hideTooltip() { tooltip.classList.add('hidden'); allWordsArray.forEach(w => w.classList.remove('active')); }
+        
+        // Skrij oblaček ob kliku kamorkoli drugam
+        document.addEventListener('mousedown', (e) => {
+            if (!e.target.classList.contains('word') && !tooltip.contains(e.target)) {
+                hideTooltip();
+            }
+        });
         
         // Finalize
         document.getElementById('btnFinishRead').onclick = async () => {
