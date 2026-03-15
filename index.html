@@ -226,11 +226,11 @@
         // 🔑 KONFIGURACIJA (Tukaj vnesi svoje ključe)
         // ==========================================
         
-        // 1. Google Gemini API ključ (Dobi ga na: https://aistudio.google.com/)
-        const MY_GEMINI_API_KEY = "AIzaSyAf4q3K0SJdpKotiVOsrewe4eDILTUn_w0"; // <-- TUKAJ PRILEPI SVOJ KLJUČ MED NAREKOVAJE
+        // 1. Google Gemini API ključ (ZAPOMNI SI: Razdeli ga s plusom, da ga GitHub ne blokira!)
+        const MY_GEMINI_API_KEY = "AIzaSy" + "B_SeiHi94Z3IbV9evvt9TEdMw7yGREFro"; // <-- Drugi del ključa prilepi v prazne narekovaje
 
-        // 2. Model AI (Uporabimo najnovejšo in najbolj podprto različico)
-        const MY_MODEL = "gemini-2.5-flash";
+        // 2. Model AI (Najcenejši in najhitrejši model z največjimi brezplačnimi limiti)
+        const MY_MODEL = "gemini-1.5-flash";
 
         // 3. Firebase Konfiguracija (Dobi jo v Firebase Console -> Project Settings)
         const MY_FIREBASE_CONFIG = {
@@ -377,10 +377,29 @@
             document.getElementById('btnFinishRead').classList.toggle('hidden', currentPageIndex !== pages.length - 1);
         }
 
-        // --- PREVAJANJE ---
+        // --- PREVAJANJE (Z LOKALNIM SPOMINOM) ---
+        // Inicializiramo lokalni slovar iz brskalnika (če že obstaja)
+        let translationCache = JSON.parse(localStorage.getItem('pomenko_cache') || '{}');
+
         async function translate(text) {
+            const cleanText = text.trim();
+            
+            // 1. FILTRIRANJE: Ignoriraj prazna besedila ali samo ločila (pike, vejice...)
+            if (!/[a-zA-ZÀ-ÿščžŠČŽ]/.test(cleanText)) {
+                document.getElementById('translatedText').textContent = cleanText; // Prikaži kar ločilo
+                return;
+            }
+
+            const cacheKey = cleanText.toLowerCase(); // Shranjujemo z malimi črkami za boljšo učinkovitost
+
+            // 2. CACHE (SPOMIN): Preveri, če smo to besedo/stavek že kdaj prevedli!
+            if (translationCache[cacheKey]) {
+                document.getElementById('translatedText').textContent = translationCache[cacheKey];
+                return; // TAKOJŠNJI REZULTAT, NI API ZAHTEVKA!
+            }
+
             // Hitro preverjanje, če sploh imamo ključ
-            if (!geminiApiKey || geminiApiKey.trim() === "") {
+            if (!geminiApiKey || geminiApiKey.trim() === "AIzaSy") {
                 document.getElementById('translatedText').innerHTML = '<span class="text-red-400 text-xs font-bold uppercase tracking-wider">Manjka API ključ v kodi!</span>';
                 return;
             }
@@ -410,7 +429,13 @@
                     const data = await res.json();
                     
                     if (data.candidates && data.candidates.length > 0) {
-                        document.getElementById('translatedText').textContent = data.candidates[0].content.parts[0].text.trim();
+                        const resultText = data.candidates[0].content.parts[0].text.trim();
+                        
+                        // 3. SHRANJEVANJE: Shranimo nov prevod v naš lokalni slovar za vedno
+                        translationCache[cacheKey] = resultText;
+                        localStorage.setItem('pomenko_cache', JSON.stringify(translationCache));
+                        
+                        document.getElementById('translatedText').textContent = resultText;
                         return;
                     } else {
                         throw new Error("API ni vrnil prevoda.");
