@@ -132,8 +132,8 @@
         <!-- POGLED 2: Urejanje -->
         <div id="editView" class="view view-hidden h-full flex flex-col bg-white p-5">
             <div class="flex items-center justify-between mb-6">
-                <button id="btnBackFromEdit" class="w-10 h-10 flex items-center justify-center bg-slate-50 text-slate-600 rounded-full active:bg-slate-100">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
+                <button id="btnBackFromEdit" class="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-700 rounded-full shadow-sm hover:bg-slate-50 active:scale-90 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
                 </button>
                 <h2 class="font-bold text-slate-800">Uredi besedilo</h2>
                 <div class="w-10"></div>
@@ -165,8 +165,8 @@
         <!-- POGLED 3: Branje -->
         <div id="readView" class="view view-hidden h-full flex flex-col bg-white absolute inset-0 z-50">
             <div class="px-5 py-4 pt-safe flex justify-between items-center border-b border-slate-50 flex-none bg-white/90 backdrop-blur-md">
-                <button id="btnBackFromRead" class="w-10 h-10 flex items-center justify-center bg-slate-50 rounded-full text-slate-500">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-5 h-5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
+                <button id="btnBackFromRead" class="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-700 rounded-full shadow-sm hover:bg-slate-50 active:scale-90 transition-all">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
                 </button>
                 <div class="text-center px-4 truncate max-w-[60%]">
                     <h3 id="readViewHeaderTitle" class="font-bold text-slate-800 text-sm truncate uppercase tracking-tight"></h3>
@@ -480,22 +480,64 @@
         // Tooltip & Selection
         let isSelecting = false, startIdx = -1, endIdx = -1;
         const container = document.getElementById('textContent');
+        
+        // --- MIŠKA (Računalnik) ---
         container.addEventListener('mousedown', (e) => {
             if(e.target.classList.contains('word')) {
                 isSelecting=true; startIdx = parseInt(e.target.dataset.index); endIdx=startIdx; updateSelection(); hideTooltip();
             }
         });
-        container.addEventListener('mouseover', (e) => { if(isSelecting && e.target.classList.contains('word')) { endIdx=parseInt(e.target.dataset.index); updateSelection(); } });
-        window.addEventListener('mouseup', () => {
+        container.addEventListener('mouseover', (e) => { 
+            if(isSelecting && e.target.classList.contains('word')) { 
+                endIdx=parseInt(e.target.dataset.index); updateSelection(); 
+            } 
+        });
+        
+        // --- DOTIK (Telefon / Tablica) ---
+        container.addEventListener('touchstart', (e) => {
+            if(e.target.classList.contains('word')) {
+                isSelecting=true; startIdx = parseInt(e.target.dataset.index); endIdx=startIdx; updateSelection(); hideTooltip();
+            }
+        }, {passive: true});
+        
+        container.addEventListener('touchmove', (e) => {
+            if(!isSelecting) return;
+            // Preprečimo drsenje strani med izbiranjem besedila, da se ekran ne premika gor in dol
+            if(e.cancelable) e.preventDefault(); 
+            
+            const touch = e.touches[0];
+            const el = document.elementFromPoint(touch.clientX, touch.clientY);
+            if(el && el.classList.contains('word')) {
+                const currentIdx = parseInt(el.dataset.index);
+                if (currentIdx !== endIdx) {
+                    endIdx = currentIdx;
+                    updateSelection();
+                }
+            }
+        }, {passive: false});
+
+        // --- ZAKLJUČEK IZBIRE (Skupno) ---
+        const finishSelection = () => {
             if(isSelecting) {
                 isSelecting=false;
                 const min = Math.min(startIdx, endIdx), max = Math.max(startIdx, endIdx);
                 const first = allWordsArray[min], last = allWordsArray[max];
-                const range = document.createRange(); range.setStartBefore(first); range.setEndAfter(last);
+                if(!first || !last) return;
+                
+                const range = document.createRange(); 
+                range.setStartBefore(first); 
+                range.setEndAfter(last);
                 const txt = range.toString().trim();
-                if(txt) { showTooltip(txt, first.getBoundingClientRect()); translate(txt); }
+                
+                if(txt) { 
+                    showTooltip(txt, first.getBoundingClientRect()); 
+                    translate(txt); 
+                }
             }
-        });
+        };
+        
+        window.addEventListener('mouseup', finishSelection);
+        window.addEventListener('touchend', finishSelection);
 
         function updateSelection() {
             const min = Math.min(startIdx, endIdx), max = Math.max(startIdx, endIdx);
