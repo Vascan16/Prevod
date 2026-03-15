@@ -227,9 +227,12 @@
         // ==========================================
         
         // 1. Google Gemini API ključ (Dobi ga na: https://aistudio.google.com/)
-        const MY_GEMINI_API_KEY = "AIzaSyCEqsBPMiXoPlbOt3W7N_iBMOAd3hMNDGk"; // <-- TUKAJ PRILEPI SVOJ KLJUČ MED NAREKOVAJE
+        const MY_GEMINI_API_KEY = ""; // <-- TUKAJ PRILEPI SVOJ KLJUČ MED NAREKOVAJE
 
-        // 2. Firebase Konfiguracija (Dobi jo v Firebase Console -> Project Settings)
+        // 2. Model AI (gemini-1.5-flash je najhitrejši in najcenejši za to nalogo)
+        const MY_MODEL = "gemini-1.5-flash";
+
+        // 3. Firebase Konfiguracija (Dobi jo v Firebase Console -> Project Settings)
         const MY_FIREBASE_CONFIG = {
   apiKey: "AIzaSyAKMFX_OfwA50-NSsjd3Nnv2q5vjHG72Jc",
   authDomain: "prevod-57726.firebaseapp.com",
@@ -245,8 +248,9 @@
         // ==========================================
 
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : MY_FIREBASE_CONFIG;
-        // Posodobljeno: Najprej poskusi uporabiti tvoj ključ. Če ga ni, uporabi sistemskega.
+        // Posodobljeno: Najprej poskusi uporabiti tvoj ključ in tvoj izbrani model
         const geminiApiKey = MY_GEMINI_API_KEY !== "" ? MY_GEMINI_API_KEY : (typeof __gemini_api_key !== 'undefined' ? __gemini_api_key : "");
+        const aiModel = MY_GEMINI_API_KEY !== "" ? MY_MODEL : "gemini-2.5-flash-preview-09-2025";
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'pomenko-prod';
 
         const app = initializeApp(firebaseConfig);
@@ -375,35 +379,54 @@
 
         // --- PREVAJANJE ---
         async function translate(text) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${geminiApiKey}`;
+            // Hitro preverjanje, če sploh imamo ključ
+            if (!geminiApiKey || geminiApiKey.trim() === "") {
+                document.getElementById('translatedText').innerHTML = '<span class="text-red-400 text-xs font-bold uppercase tracking-wider">Manjka API ključ v kodi!</span>';
+                return;
+            }
+
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${aiModel}:generateContent?key=${geminiApiKey}`;
             // Posodobljeno: Zelo strogo navodilo za AI
             const payload = JSON.stringify({ contents: [{ parts: [{ text: `Prevedi naslednje v slovenščino. Napiši IZKLJUČNO samo prevod in popolnoma ničesar drugega: "${text}"` }] }] });
             
             const delays = [1000, 2000, 4000, 8000, 16000];
             let attempt = 0;
+            let lastErrorMsg = "Neznana napaka";
 
             while (attempt <= delays.length) {
                 try {
                     const res = await fetch(url, {
                         method: 'POST',
-                        body: payload
+                        body: payload,
+                        headers: { 'Content-Type': 'application/json' }
                     });
                     
-                    if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+                    if (!res.ok) {
+                        // Preberemo točno napako, ki jo je vrnil Google
+                        const errData = await res.json().catch(() => ({}));
+                        throw new Error(errData?.error?.message || `HTTP napaka: ${res.status}`);
+                    }
+                    
                     const data = await res.json();
                     
                     if (data.candidates && data.candidates.length > 0) {
                         document.getElementById('translatedText').textContent = data.candidates[0].content.parts[0].text.trim();
                         return;
                     } else {
-                        throw new Error("Neveljaven odgovor API-ja");
+                        throw new Error("API ni vrnil prevoda.");
                     }
                 } catch (e) {
+                    lastErrorMsg = e.message;
                     if (attempt < delays.length) {
                         await new Promise(resolve => setTimeout(resolve, delays[attempt]));
                         attempt++;
                     } else {
-                        document.getElementById('translatedText').innerHTML = '<span class="text-red-400 text-sm">Napaka pri prevajanju. Preverite API ključ.</span>';
+                        // Prikažemo specifično napako uporabniku v oblačku
+                        document.getElementById('translatedText').innerHTML = `
+                            <div class="flex flex-col gap-1 max-w-[220px]">
+                                <span class="text-red-400 text-[10px] font-bold uppercase tracking-widest border-b border-red-400/30 pb-1 mb-1">Napaka sistema</span>
+                                <span class="text-white text-xs leading-snug break-words opacity-90">${lastErrorMsg}</span>
+                            </div>`;
                         return;
                     }
                 }
