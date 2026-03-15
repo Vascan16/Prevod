@@ -141,17 +141,20 @@
             
             <input type="text" id="textTitle" class="w-full text-2xl font-bold outline-none mb-6 placeholder-slate-200 border-none focus:ring-0" placeholder="Naslov zgodbe...">
             
-            <div class="grid grid-cols-2 gap-3 mb-6 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
-                <select id="srcLang" class="bg-white border border-slate-100 rounded-xl p-3 text-sm font-semibold outline-none shadow-sm">
-                    <option value="Samodejno prepoznaj">Samodejno</option>
-                    <option value="Angleščina">Angleščina</option>
-                    <option value="Nemščina">Nemščina</option>
-                    <option value="Španščina">Španščina</option>
-                </select>
-                <select id="tgtLang" class="bg-white border border-slate-100 rounded-xl p-3 text-sm font-semibold outline-none shadow-sm text-blue-600">
+            <div class="flex items-center mb-6 bg-slate-50 p-1.5 rounded-2xl border border-slate-100">
+                <div class="flex-1 text-center text-sm font-semibold text-slate-500">Samodejno zaznaj</div>
+                
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-4 h-4 text-slate-300 mx-1 shrink-0">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+                </svg>
+                
+                <select id="tgtLang" class="flex-1 bg-white border border-slate-100 rounded-xl p-3 text-sm font-bold outline-none shadow-sm text-blue-600 text-center cursor-pointer">
                     <option value="Slovenščina">Slovenščina</option>
                     <option value="Angleščina">Angleščina</option>
                 </select>
+                
+                <!-- Skrito polje ohrani kompatibilnost s preostalo JS kodo -->
+                <input type="hidden" id="srcLang" value="Samodejno prepoznaj">
             </div>
 
             <textarea id="textInput" class="w-full flex-grow bg-slate-50 border-none rounded-2xl p-5 focus:ring-2 focus:ring-blue-100 outline-none resize-none text-lg leading-relaxed mb-6" placeholder="Prilepi tekst tukaj..."></textarea>
@@ -164,43 +167,45 @@
 
         <!-- POGLED 3: Branje -->
         <div id="readView" class="view view-hidden h-full flex flex-col bg-white absolute inset-0 z-50">
-            <div class="px-5 py-4 pt-safe flex justify-between items-center border-b border-slate-50 flex-none bg-white/90 backdrop-blur-md">
-                <button id="btnBackFromRead" class="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-700 rounded-full shadow-sm hover:bg-slate-50 active:scale-90 transition-all">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 pr-0.5"><path d="M15 18l-6-6 6-6"/></svg>
+            <div class="px-5 py-3 pt-safe flex justify-between items-center bg-white flex-none">
+                <button id="btnBackFromRead" class="w-10 h-10 flex items-center justify-center bg-white border border-slate-200 text-slate-700 rounded-full shadow-sm hover:bg-slate-50 active:scale-90 transition-all shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 pr-0.5"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" /></svg>
                 </button>
-                <div class="text-center px-4 truncate max-w-[60%]">
+                <div class="text-center px-4 truncate flex-1">
                     <h3 id="readViewHeaderTitle" class="font-bold text-slate-800 text-sm truncate uppercase tracking-tight"></h3>
-                    <div id="readProgress" class="text-[10px] text-slate-400 font-bold tracking-widest uppercase"></div>
+                    <div id="readProgress" class="text-[10px] text-slate-400 font-bold tracking-widest uppercase mt-0.5"></div>
                 </div>
-                <button id="btnEditFromRead" class="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-2 rounded-lg">UREDI</button>
+                <button id="btnEditFromRead" class="text-[11px] font-bold text-blue-600 bg-blue-50 px-4 py-2 rounded-lg tracking-wider shrink-0">UREDI</button>
             </div>
 
-            <div class="flex-grow overflow-y-auto no-scrollbar p-6 flex flex-col justify-start pb-52">
-                <div id="textContent" class="text-2xl sm:text-3xl leading-[1.7] text-slate-800 whitespace-pre-wrap select-none min-h-[50vh] font-medium tracking-tight">
+            <div class="flex-grow overflow-y-auto no-scrollbar p-6 pt-2 pb-32 flex flex-col justify-start">
+                <div id="textContent" class="text-[21px] sm:text-[23px] leading-[1.5] text-slate-800 whitespace-pre-wrap select-none min-h-[50vh] tracking-normal font-normal">
                     <!-- Tekst -->
                 </div>
             </div>
 
             <!-- Modern iPhone-style Player & Nav -->
-            <div class="absolute bottom-0 left-0 right-0 glass border-t border-slate-100 p-6 pb-safe flex justify-between items-center z-20">
+            <div class="absolute bottom-0 left-0 right-0 bg-white border-t border-slate-50 p-6 pb-safe flex justify-between items-center z-20">
                 <div class="flex-1 flex justify-start">
-                    <button id="btnPrevCard" class="w-12 h-12 flex items-center justify-center rounded-2xl bg-slate-100 text-slate-400 disabled:opacity-30">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M9.195 18.44c1.25.713 2.805-.19 2.805-1.629v-2.34l6.945 3.968c1.25.714 2.805-.188 2.805-1.628V5.19c0-1.44-1.555-2.342-2.805-1.628L12 7.53v-2.34c0-1.44-1.555-2.343-2.805-1.629l-7.108 4.062c-1.26.72-1.26 2.536 0 3.256l7.108 4.061z" /></svg>
+                    <button id="btnPrevCard" class="w-12 h-12 flex items-center justify-center rounded-full bg-slate-50 text-slate-300 disabled:opacity-30 active:scale-90 transition-transform">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"><path d="M12.636 12.001l7.364-5v10l-7.364-5zm-8 0l7.364-5v10l-7.364-5z" /></svg>
                     </button>
                 </div>
                 
                 <div class="flex-1 flex justify-center">
-                    <button id="btnPodcastPlay" class="w-16 h-16 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-2xl active:scale-90 transition-all border-4 border-white">
-                        <svg id="iconPlay" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-7 h-7 ml-1"><path fill-rule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clip-rule="evenodd" /></svg>
-                        <svg id="iconPause" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-7 h-7 hidden"><path fill-rule="evenodd" d="M6.75 5.25a.75.75 0 01.75-.75H9a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H7.5a.75.75 0 01-.75-.75V5.25zm7.5 0a.75.75 0 01.75-.75h1.5a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75h-1.5a.75.75 0 01-.75-.75V5.25z" clip-rule="evenodd" /></svg>
+                    <button id="btnPodcastPlay" class="w-16 h-16 rounded-full bg-[#111827] text-white flex items-center justify-center shadow-lg active:scale-90 transition-all">
+                        <svg id="iconPlay" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 ml-1"><path d="M6 4l15 8-15 8z" /></svg>
+                        <svg id="iconPause" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 hidden"><path fill-rule="evenodd" d="M6.75 5.25a.75.75 0 01.75-.75H9a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H7.5a.75.75 0 01-.75-.75V5.25zm7.5 0a.75.75 0 01.75-.75h1.5a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75h-1.5a.75.75 0 01-.75-.75V5.25z" clip-rule="evenodd" /></svg>
                     </button>
                 </div>
                 
-                <div class="flex-1 flex justify-end">
-                    <button id="btnNextCard" class="w-12 h-12 flex items-center justify-center rounded-2xl bg-blue-600 text-white shadow-lg shadow-blue-200 active:scale-90">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6"><path d="M5.055 7.06c-1.25-.714-2.805.189-2.805 1.628v8.123c0 1.44 1.555 2.342 2.805 1.628L12 14.471v2.34c0 1.44 1.555 2.342 2.805 1.628l7.108-4.061c1.26-.72 1.26-2.536 0-3.256L14.805 7.06C13.555 6.346 12 7.25 12 8.688v2.34L5.055 7.06z" /></svg>
+                <div class="flex-1 flex justify-end relative">
+                    <button id="btnNextCard" class="w-12 h-12 flex items-center justify-center rounded-full bg-blue-600 text-white shadow-md shadow-blue-200 active:scale-90 transition-transform disabled:opacity-30">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5"><path d="M11.364 12.001l-7.364-5v10l7.364-5zm8 0l-7.364-5v10l7.364-5z" /></svg>
                     </button>
-                    <button id="btnFinishRead" class="hidden px-5 h-12 rounded-2xl bg-green-500 text-white font-bold shadow-lg shadow-green-100 items-center justify-center">ZAKLJUČI</button>
+                    <button id="btnFinishRead" class="hidden absolute top-0 right-0 w-12 h-12 rounded-full bg-emerald-500 text-white shadow-md shadow-emerald-200 flex items-center justify-center active:scale-90 transition-transform">
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor" class="w-6 h-6"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
+                    </button>
                 </div>
             </div>
         </div>
@@ -229,7 +234,7 @@
         // 1. Google Gemini API ključ (ZAPOMNI SI: Razdeli ga s plusom, da ga GitHub ne blokira!)
         const MY_GEMINI_API_KEY = "AIzaSy" + "B_SeiHi94Z3IbV9evvt9TEdMw7yGREFro"; // <-- Drugi del ključa prilepi v prazne narekovaje
 
-        // 2. Model AI (Najcenejši in najhitrejši model z največjimi brezplačnimi limiti)
+        // 2. Model AI (Uporabimo "Lite" različico iz tvojega seznama za najnižjo porabo)
         const MY_MODEL = "gemini-2.5-flash-lite";
 
         // 3. Firebase Konfiguracija (Dobi jo v Firebase Console -> Project Settings)
@@ -348,15 +353,36 @@
         }
 
         function paginate(text) {
-            const paragraphs = text.split(/\n+/).filter(p => p.trim());
             pages = [];
-            let current = "";
-            paragraphs.forEach(p => {
-                if ((current.length + p.length) < 450) current += (current ? "\n\n" : "") + p;
-                else { if(current) pages.push(current); current = p; }
-            });
-            if(current) pages.push(current);
-            if(!pages.length) pages.push("Besedilo je prazno.");
+            if (!text || !text.trim()) {
+                pages.push("Besedilo je prazno.");
+                return;
+            }
+
+            const MAX_CHARS = 800; // Optimalno število znakov na eno kartico (stran)
+            let remaining = text.trim();
+
+            while (remaining.length > 0) {
+                if (remaining.length <= MAX_CHARS) {
+                    pages.push(remaining);
+                    break;
+                }
+                
+                // Poskušamo najti presledek blizu limite, da ne pretrgamo besede
+                let splitPos = remaining.lastIndexOf(' ', MAX_CHARS);
+                
+                // Če imamo v bližini nov odstavek (enter), raje prelomimo tam
+                let newlinePos = remaining.lastIndexOf('\n', MAX_CHARS);
+                if (newlinePos > MAX_CHARS - 150) {
+                    splitPos = newlinePos;
+                }
+
+                // Varnostni prelom, če ni nobenih presledkov (zelo dolga beseda)
+                if (splitPos <= 0) splitPos = MAX_CHARS;
+
+                pages.push(remaining.substring(0, splitPos).trim());
+                remaining = remaining.substring(splitPos).trim();
+            }
         }
 
         function renderPage() {
